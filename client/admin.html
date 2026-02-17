@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Gestión de reservas</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+
+body{
+  font-family:Montserrat;
+  background:#f5f5f5;
+  margin:0;
+  padding:30px 0;
+}
+
+h1{
+  margin-bottom:25px;
+  text-align:center;   /* 👈 esto centra el título */
+}
+
+/* ===== TABLA FULL WIDTH ===== */
+.table{
+  width:100%;
+  max-width:1400px;
+  margin:0 auto;
+  background:#fff;
+  border:1px solid #ddd;
+  border-radius:10px;
+  overflow:hidden;
+}
+
+/* ===== FILAS ===== */
+.row{
+  display:grid;
+  grid-template-columns: 
+  120px 80px 160px 1fr 1fr 2fr 1.5fr 120px 200px;
+}
+
+/* CABECERA MÁS CLARA */
+.header{
+  font-weight:600;
+  background:#f2f2f2;
+  border-bottom:2px solid #ddd;
+}
+
+/* CELDAS MÁS ESPACIADAS */
+.cell{
+  padding:14px 12px;
+  border-bottom:1px solid #eee;
+  font-size:14px;
+  display:flex;
+  align-items:center;
+  white-space:normal;
+}
+
+/* FILAS CON ESPACIO VISUAL */
+.row{
+  display:grid;
+  grid-template-columns: 
+  120px 80px 160px 1fr 1fr 2fr 1.5fr 120px 200px;
+  gap:0px; /* separación interna */
+}
+
+/* EFECTO HOVER */
+.row:not(.header):hover{
+  background:#fafafa;
+}
+
+/* REDONDEAR TABLA MÁS SUAVE */
+.table{
+  border-radius:12px;
+  box-shadow:0 2px 6px rgba(0,0,0,0.05);
+}
+
+
+/* ===== ESTADOS ===== */
+.pending{
+  color:#b59f00;
+  font-weight:600;
+}
+
+.confirmed{
+  color:#2e7d32;
+  font-weight:600;
+}
+
+/* ===== BOTONES ===== */
+.actions{
+  display:flex;
+  gap:8px;
+}
+
+button{
+  padding:6px 12px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  font-size:13px;
+}
+
+.confirmBtn{
+  background:#2e7d32;
+  color:white;
+}
+
+.deleteBtn{
+  background:#c62828;
+  color:white;
+}
+
+</style>
+</head>
+
+<body>
+
+<h1>Gestión de reservas</h1>
+
+<div class="table">
+
+  <!-- CABECERA -->
+  <div class="row header">
+  <div class="cell">Fecha</div>
+  <div class="cell">Hora</div>
+  <div class="cell">Horas reservadas</div>
+  <div class="cell">Nombre</div>
+  <div class="cell">Apellidos</div>
+  <div class="cell">Email</div>
+  <div class="cell">Teléfono</div>
+  <div class="cell">Estado</div>
+  <div class="cell">Acciones</div>
+</div>
+
+
+  <div id="table"></div>
+  <div id="pagination" style="text-align:center; padding:15px;"></div>
+
+
+</div>
+
+
+
+
+<script>
+
+let currentPage = 1;
+const perPage = 15;
+
+async function load(){
+
+  const res = await fetch("http://localhost:3000/bookings");
+  const data = await res.json();
+
+  const table = document.getElementById("table");
+  const pagination = document.getElementById("pagination");
+
+  table.innerHTML = "";
+
+  // PAGINACIÓN
+  const start = (currentPage - 1) * perPage;
+  const end = start + perPage;
+  const pageData = data.slice(start, end);
+
+  pageData.forEach(b=>{
+
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const fecha = new Date(b.date);
+    const fechaFormateada =
+      ("0"+fecha.getDate()).slice(-2)+"/"+
+      ("0"+(fecha.getMonth()+1)).slice(-2)+"/"+
+      fecha.getFullYear();
+
+    const estadoTexto = b.status === "confirmed" ? "Confirmada" : "Pendiente";
+
+    row.innerHTML = `
+      <div class="cell">${fechaFormateada}</div>
+      <div class="cell">${b.time}:00</div>
+      <div class="cell">${b.duration}h</div>
+      <div class="cell">${b.name}</div>
+      <div class="cell">${b.lastname || ""}</div>
+      <div class="cell">${b.email}</div>
+      <div class="cell">${b.phone}</div>
+      <div class="cell ${b.status}">${estadoTexto}</div>
+      <div class="cell actions">
+        ${b.status !== "confirmed" ? `<button class="confirmBtn" onclick="confirmar(${b.id})">Confirmar</button>` : ""}
+        <button class="deleteBtn" onclick="eliminar(${b.id})">Rechazar</button>
+      </div>
+    `;
+
+    table.appendChild(row);
+
+  });
+
+  // ===== BOTONES DE PAGINA =====
+  pagination.innerHTML = "";
+
+  const totalPages = Math.ceil(data.length / perPage);
+
+  for(let i=1;i<=totalPages;i++){
+    const btn = document.createElement("button");
+    btn.innerText = i;
+    btn.style.margin = "3px";
+    btn.style.padding = "6px 10px";
+
+    if(i === currentPage){
+      btn.style.background = "#000";
+      btn.style.color = "#fff";
+    }
+
+    btn.onclick = ()=>{
+      currentPage = i;
+      load();
+    };
+
+    pagination.appendChild(btn);
+  }
+}
+
+
+/* ===== CONFIRMAR ===== */
+async function confirmar(id){
+  await fetch("http://localhost:3000/confirm/" + id, { method:"POST" });
+  load();
+}
+
+/* ===== RECHAZAR ===== */
+async function eliminar(id){
+  if(!confirm("¿Rechazar esta reserva?")) return;
+  await fetch("http://localhost:3000/delete/" + id, { method:"POST" });
+  load();
+}
+
+load();
+
+</script>
+
+</body>
+</html>
